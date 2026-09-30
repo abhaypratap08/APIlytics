@@ -66,6 +66,7 @@ Instead of three separate alerts (high traffic, high risk, high cost), APIlytics
 Setup instructions will be added as the project takes shape.
 
 ## Team
-- **Jay Singh** — [@jaysingh-143](https://github.com/jaysingh-143)
+
 - **Abhay Pratap Singh** — [@abhaypratap08](https://github.com/abhaypratap08)
+- **Jay Singh** — [@jaysingh-143](https://github.com/jaysingh-143)
 - **Hariom Mani Tripathi** — [@Hariom0901](https://github.com/Hariom0901)
