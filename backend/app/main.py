@@ -1,12 +1,16 @@
 from fastapi import FastAPI
+from app.core.config import settings
+from app.api.routes import health
 
 app = FastAPI(
-    title="APIlytics Backend",
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
     description="Telemetry ingestion, storage, detection, and API for APIlytics MVP.",
-    version="0.1.0",
 )
 
+# Register routers
+app.include_router(health.router)
 
-@app.get("/")
+@app.get("/", tags=["Root"])
 def read_root():
     return {"message": "APIlytics backend is running. Go to /docs for the API."}
