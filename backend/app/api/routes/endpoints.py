@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -8,19 +10,16 @@ from app.services.metrics import InvalidWindowError, compute_endpoints
 router = APIRouter()
 
 
-@router.get(
-    "/api/v1/endpoints",
-    response_model=EndpointsResponse,
-    tags=["Metrics"],
-    summary="Per-endpoint aggregate metrics for a time window",
-)
+@router.get("/api/v1/endpoints", response_model=EndpointsResponse, tags=["Metrics"],
+            summary="Per-endpoint aggregates for a project and window")
 def get_endpoints(
     window: str = Query("60m", description="One of 15m, 60m, 24h"),
-    limit: int = Query(20, ge=1, le=100, description="Max endpoints to return (1-100)"),
+    limit: int = Query(20, ge=1, le=100),
+    project_id: uuid.UUID = Query(..., description="Project ID (required, Mode B tenant scope)"),
     db: Session = Depends(get_db),
 ) -> EndpointsResponse:
     try:
-        data = compute_endpoints(db, window, limit)
+        data = compute_endpoints(db, window, limit, project_id)
     except InvalidWindowError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return EndpointsResponse(**data)

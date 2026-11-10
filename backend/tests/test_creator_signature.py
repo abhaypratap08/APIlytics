@@ -1,4 +1,3 @@
-"""Verifies creator attribution headers and root metadata."""
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -13,14 +12,14 @@ def test_creator_header_on_health():
     assert r.headers.get("x-project-owner") == "Backend and Integration"
 
 
-def test_creator_header_on_summary():
-    r = client.get("/api/v1/summary?window=60m")
+def test_creator_header_on_summary(project_ctx):
+    r = client.get(f"/api/v1/summary?window=60m&project_id={project_ctx['project_id']}")
     assert r.status_code == 200
     assert r.headers.get("x-creator") == "Abhay Pratap Singh"
 
 
-def test_creator_header_on_endpoints():
-    r = client.get("/api/v1/endpoints?window=60m")
+def test_creator_header_on_endpoints(project_ctx):
+    r = client.get(f"/api/v1/endpoints?window=60m&project_id={project_ctx['project_id']}")
     assert r.status_code == 200
     assert r.headers.get("x-creator") == "Abhay Pratap Singh"
 

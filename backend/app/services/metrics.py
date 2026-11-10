@@ -1,4 +1,9 @@
-"""Summary and endpoint aggregation — authored by Abhay Pratap Singh."""
+"""Summary and endpoint aggregation — authored by Abhay Pratap Singh.
+
+All queries are scoped to a single project_id. Mode B: never aggregate
+across projects — a project_id missing from the filter is a bug.
+"""
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
@@ -19,49 +24,33 @@ class InvalidWindowError(ValueError):
 
 
 def parse_window(window: str) -> timedelta:
-    """Convert '15m' / '60m' / '24h' to a timedelta. Raises InvalidWindowError otherwise."""
     if window not in ALLOWED_WINDOWS:
         allowed = ", ".join(ALLOWED_WINDOWS.keys())
         raise InvalidWindowError(f"Unsupported window '{window}'. Use one of: {allowed}.")
     return ALLOWED_WINDOWS[window]
 
 
-def compute_summary(db: Session, window: str) -> dict:
-    """
-    Aggregate telemetry over the selected window.
+def _window_filters(project_id: uuid.UUID, start: datetime, end: datetime):
+    return (
+        TelemetryEvent.project_id == project_id,
+        TelemetryEvent.timestamp >= start,
+        TelemetryEvent.timestamp <= end,
+    )
 
-    Error = status_code >= 500 (per API contract).
-    p95 uses percentile_cont(0.95) (linear interpolation) on latency_ms.
-    Cost = total_requests / 1000 * COST_PER_1000_REQUESTS (demo estimate).
-    Empty window: all counts, latencies, and cost return 0.
-    """
+
+def compute_summary(db: Session, window: str, project_id: uuid.UUID) -> dict:
     delta = parse_window(window)
     now = datetime.now(timezone.utc)
     start = now - delta
+    base_filters = _window_filters(project_id, start, now)
 
-    base_filters = (
-        TelemetryEvent.timestamp >= start,
-        TelemetryEvent.timestamp <= now,
-    )
-
-    total = db.scalar(
-        select(func.count()).select_from(TelemetryEvent).where(*base_filters)
-    ) or 0
-
+    total = db.scalar(select(func.count()).select_from(TelemetryEvent).where(*base_filters)) or 0
     error_count = db.scalar(
-        select(func.count())
-        .select_from(TelemetryEvent)
-        .where(*base_filters, TelemetryEvent.status_code >= 500)
+        select(func.count()).select_from(TelemetryEvent).where(*base_filters, TelemetryEvent.status_code >= 500)
     ) or 0
-
-    avg_latency = db.scalar(
-        select(func.avg(TelemetryEvent.latency_ms)).where(*base_filters)
-    )
-
+    avg_latency = db.scalar(select(func.avg(TelemetryEvent.latency_ms)).where(*base_filters))
     p95_latency = db.scalar(
-        select(
-            func.percentile_cont(0.95).within_group(TelemetryEvent.latency_ms)
-        ).where(*base_filters)
+        select(func.percentile_cont(0.95).within_group(TelemetryEvent.latency_ms)).where(*base_filters)
     )
 
     error_rate_pct = (error_count / total * 100) if total else 0.0
@@ -77,72 +66,48 @@ def compute_summary(db: Session, window: str) -> dict:
         "p95_latency_ms": round(float(p95_latency), 1) if p95_latency is not None else 0.0,
         "estimated_cost": round(estimated_cost, 2),
         "cost_unit": settings.COST_UNIT,
-        "alerts_count": _count_alerts(db, window),
+        "alerts_count": _count_alerts(db, window, project_id),
     }
 
 
-def compute_endpoints(db: Session, window: str, limit: int = 20) -> dict:
-    """
-    Aggregate telemetry by (method, route_template) for the selected window.
-
-    Same window, error definition (status_code >= 500), p95 method,
-    and cost formula as compute_summary — totals must agree across both endpoints.
-    """
+def compute_endpoints(db: Session, window: str, limit: int, project_id: uuid.UUID) -> dict:
     delta = parse_window(window)
     now = datetime.now(timezone.utc)
     start = now - delta
-
-    base_filters = (
-        TelemetryEvent.timestamp >= start,
-        TelemetryEvent.timestamp <= now,
-    )
+    base_filters = _window_filters(project_id, start, now)
 
     count_col = func.count().label("request_count")
     error_col = func.count().filter(TelemetryEvent.status_code >= 500).label("error_count")
     avg_col = func.avg(TelemetryEvent.latency_ms).label("avg_latency")
-    p95_col = func.percentile_cont(0.95).within_group(
-        TelemetryEvent.latency_ms
-    ).label("p95_latency")
+    p95_col = func.percentile_cont(0.95).within_group(TelemetryEvent.latency_ms).label("p95_latency")
 
     stmt = (
         select(
-            TelemetryEvent.method,
-            TelemetryEvent.route_template,
-            count_col,
-            error_col,
-            avg_col,
-            p95_col,
+            TelemetryEvent.method, TelemetryEvent.route_template,
+            count_col, error_col, avg_col, p95_col,
         )
         .where(*base_filters)
         .group_by(TelemetryEvent.method, TelemetryEvent.route_template)
         .order_by(count_col.desc())
         .limit(limit)
     )
-
     rows = db.execute(stmt).all()
 
     items = []
-    for method, route_template, request_count, error_count, avg_latency, p95_latency in rows:
-        error_rate_pct = (error_count / request_count * 100) if request_count else 0.0
-        estimated_cost = (request_count / 1000) * settings.COST_PER_1000_REQUESTS
-        items.append(
-            {
-                "route_template": route_template,
-                "method": method,
-                "request_count": int(request_count),
-                "error_rate_pct": round(error_rate_pct, 2),
-                "avg_latency_ms": round(float(avg_latency), 1) if avg_latency is not None else 0.0,
-                "p95_latency_ms": round(float(p95_latency), 1) if p95_latency is not None else 0.0,
-                "estimated_cost": round(estimated_cost, 2),
-                "cost_unit": settings.COST_UNIT,
-            }
-        )
-
+    for method, route, rc, ec, avg, p95 in rows:
+        items.append({
+            "route_template": route,
+            "method": method,
+            "request_count": int(rc),
+            "error_rate_pct": round((ec / rc * 100) if rc else 0.0, 2),
+            "avg_latency_ms": round(float(avg), 1) if avg is not None else 0.0,
+            "p95_latency_ms": round(float(p95), 1) if p95 is not None else 0.0,
+            "estimated_cost": round((rc / 1000) * settings.COST_PER_1000_REQUESTS, 2),
+            "cost_unit": settings.COST_UNIT,
+        })
     return {"window": window, "items": items}
 
 
-
-def _count_alerts(db: Session, window: str) -> int:
-    """Lazy import to avoid circular import with app.services.alerts."""
+def _count_alerts(db: Session, window: str, project_id: uuid.UUID) -> int:
     from app.services.alerts import compute_alerts
-    return len(compute_alerts(db, window, limit=1000)["items"])
+    return len(compute_alerts(db, window, project_id, limit=1000)["items"])

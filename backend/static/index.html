@@ -172,7 +172,7 @@
     <script>
         (() => {
             const API = ''; // same origin — page is served by FastAPI
-            const state = { window: '60m' };
+            const state = { window: '60m', projectId: null };
 
             const $ = (id) => document.getElementById(id);
 
@@ -271,14 +271,14 @@
                 }
 
                 try {
-                    const summary = await fetchJSON(`/api/v1/summary?window=${state.window}`);
+                    const summary = await fetchJSON(`/api/v1/summary?window=${state.window}&project_id=${state.projectId}`);
                     renderSummary(summary);
                 } catch (e) {
                     showBanner(`Summary failed:\n${e.message}`);
                 }
 
                 try {
-                    const endpoints = await fetchJSON(`/api/v1/endpoints?window=${state.window}&limit=20`);
+                    const endpoints = await fetchJSON(`/api/v1/endpoints?window=${state.window}&limit=20&project_id=${state.projectId}`);
                     renderEndpoints(endpoints);
                 } catch (e) {
                     renderEndpointsUnavailable(e);
@@ -314,7 +314,7 @@
                     }));
                 }
                 try {
-                    const res = await fetch(API + '/api/v1/events', {
+                    const res = await fetch(API + '/api/v1/dev/ingest', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ events }),
