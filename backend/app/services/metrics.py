@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.intelligence.cost import estimate_cost
 from app.models.telemetry import TelemetryEvent
 
 ALLOWED_WINDOWS: dict[str, timedelta] = {
@@ -54,7 +55,7 @@ def compute_summary(db: Session, window: str, project_id: uuid.UUID) -> dict:
     )
 
     error_rate_pct = (error_count / total * 100) if total else 0.0
-    estimated_cost = (total / 1000) * settings.COST_PER_1000_REQUESTS
+    estimated_cost = estimate_cost(total, settings.COST_PER_1000_REQUESTS)
 
     return {
         "window": window,
@@ -102,7 +103,7 @@ def compute_endpoints(db: Session, window: str, limit: int, project_id: uuid.UUI
             "error_rate_pct": round((ec / rc * 100) if rc else 0.0, 2),
             "avg_latency_ms": round(float(avg), 1) if avg is not None else 0.0,
             "p95_latency_ms": round(float(p95), 1) if p95 is not None else 0.0,
-            "estimated_cost": round((rc / 1000) * settings.COST_PER_1000_REQUESTS, 2),
+            "estimated_cost": round(estimate_cost(rc, settings.COST_PER_1000_REQUESTS), 2),
             "cost_unit": settings.COST_UNIT,
         })
     return {"window": window, "items": items}
