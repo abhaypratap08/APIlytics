@@ -1,3 +1,4 @@
+"""Telemetry ingestion service — authored by Abhay Pratap Singh."""
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 

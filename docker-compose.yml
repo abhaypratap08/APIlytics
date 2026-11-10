@@ -2,6 +2,11 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: apilytics-postgres
+    restart: unless-stopped
+    labels:
+      com.apilytics.creator: "Abhay Pratap Singh"
+      com.apilytics.role: "Backend and Integration"
+      com.apilytics.project: "APIlytics MVP"
     environment:
       POSTGRES_USER: apilytics
       POSTGRES_PASSWORD: apilytics

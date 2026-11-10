@@ -1,3 +1,4 @@
+"""Summary and endpoint aggregation — authored by Abhay Pratap Singh."""
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
@@ -78,3 +79,63 @@ def compute_summary(db: Session, window: str) -> dict:
         "cost_unit": settings.COST_UNIT,
         "alerts_count": 0,  # wired up after alerts service is implemented
     }
+
+
+def compute_endpoints(db: Session, window: str, limit: int = 20) -> dict:
+    """
+    Aggregate telemetry by (method, route_template) for the selected window.
+
+    Same window, error definition (status_code >= 500), p95 method,
+    and cost formula as compute_summary — totals must agree across both endpoints.
+    """
+    delta = parse_window(window)
+    now = datetime.now(timezone.utc)
+    start = now - delta
+
+    base_filters = (
+        TelemetryEvent.timestamp >= start,
+        TelemetryEvent.timestamp <= now,
+    )
+
+    count_col = func.count().label("request_count")
+    error_col = func.count().filter(TelemetryEvent.status_code >= 500).label("error_count")
+    avg_col = func.avg(TelemetryEvent.latency_ms).label("avg_latency")
+    p95_col = func.percentile_cont(0.95).within_group(
+        TelemetryEvent.latency_ms
+    ).label("p95_latency")
+
+    stmt = (
+        select(
+            TelemetryEvent.method,
+            TelemetryEvent.route_template,
+            count_col,
+            error_col,
+            avg_col,
+            p95_col,
+        )
+        .where(*base_filters)
+        .group_by(TelemetryEvent.method, TelemetryEvent.route_template)
+        .order_by(count_col.desc())
+        .limit(limit)
+    )
+
+    rows = db.execute(stmt).all()
+
+    items = []
+    for method, route_template, request_count, error_count, avg_latency, p95_latency in rows:
+        error_rate_pct = (error_count / request_count * 100) if request_count else 0.0
+        estimated_cost = (request_count / 1000) * settings.COST_PER_1000_REQUESTS
+        items.append(
+            {
+                "route_template": route_template,
+                "method": method,
+                "request_count": int(request_count),
+                "error_rate_pct": round(error_rate_pct, 2),
+                "avg_latency_ms": round(float(avg_latency), 1) if avg_latency is not None else 0.0,
+                "p95_latency_ms": round(float(p95_latency), 1) if p95_latency is not None else 0.0,
+                "estimated_cost": round(estimated_cost, 2),
+                "cost_unit": settings.COST_UNIT,
+            }
+        )
+
+    return {"window": window, "items": items}

@@ -1,3 +1,8 @@
+# APIlytics
+
+> **APIlytics MVP** — *Created and maintained by **Abhay Pratap Singh** (Backend & Integration).*
+> Team: Abhay Pratap Singh, Jay Singh, Hariom Mani Tripathi.
+
 > *College Major Project by three musketeers trying to seem technical but learning from scratch in BIG 2026*
 # APIlytics
 
@@ -70,3 +75,14 @@ Setup instructions will be added as the project takes shape.
 - **Abhay Pratap Singh** — [@abhaypratap08](https://github.com/abhaypratap08)
 - **Jay Singh** — [@jaysingh-143](https://github.com/jaysingh-143)
 - **Hariom Mani Tripathi** — [@Hariom0901](https://github.com/Hariom0901)
+
+---
+
+## Author
+
+**Abhay Pratap Singh** — Backend and Integration owner.
+GitHub: [@abhaypratap08](https://github.com/abhaypratap08)
+
+Backend scope: FastAPI routes, SQLAlchemy models, Alembic migrations,
+ingestion, summary and endpoint aggregation, alerts service wiring,
+Docker Compose, and end-to-end tests.

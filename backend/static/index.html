@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>APIlytics · Dev Console · by Abhay Pratap Singh</title>
+    <!-- <style>
+  :root {
+    --bg: #0f1419; --panel: #161b22; --border: #2a3038;
+    --text: #e6edf3; --muted: #8b949e; --accent: #2ea043;
+    --warn: #d29922; --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  h2 { margin: 0 0 12px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 500;
+    background: #1f2937; color: var(--muted);
+  }
+  .badge.ok { background: #0d2818; color: var(--accent); }
+  .badge.err { background: #2d1214; color: var(--err); }
+  .byline {
+    font-size: 12px; color: var(--muted);
+    padding: 3px 10px; border-radius: 999px;
+    border: 1px dashed var(--border);
+  }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  button, select {
+    font: inherit; padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    cursor: pointer;
+  }
+  button:hover { background: #1e242c; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.primary:hover { background: #2a7ff0; }
+  .banner {
+    padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;
+    background: #2d1214; border: 1px solid var(--err); color: var(--err);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .kpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .kpi .value { font-size: 22px; font-weight: 600; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .kpi .unit { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; margin-bottom: 16px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 500; }
+  td.num { text-align: right; }
+  tr:last-child td { border-bottom: none; }
+  .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+  details > summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  pre {
+    background: #0a0e13; border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; overflow: auto; max-height: 400px; margin: 12px 0 0;
+    font-size: 12px; line-height: 1.5;
+  }
+  .foot { font-size: 12px; color: var(--muted); margin-top: 8px; }
+</style> -->
+</head>
+
+<body>
+
+    <header>
+        <h1>APIlytics · Dev Console</h1>
+  <span class="byline">by Abhay Pratap Singh · Backend &amp; Integration</span>
+        <span id="health" class="badge">checking…</span>
+    </header>
+
+    <div class="controls">
+        <select id="window">
+            <option value="15m">15m</option>
+            <option value="60m" selected>60m</option>
+            <option value="24h">24h</option>
+        </select>
+        <button id="refresh" class="primary">Refresh</button>
+        <button id="seed-normal">Send 5 normal events</button>
+        <button id="seed-errors">Send 3 error events</button>
+    </div>
+
+    <div id="banner" class="banner" style="display:none"></div>
+
+    <div class="kpis" id="kpis">
+        <div class="kpi">
+            <div class="label">Total requests</div>
+            <div class="value" id="kpi-total">—</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Errors (5xx)</div>
+            <div class="value" id="kpi-errors">—</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Error rate</div>
+            <div class="value" id="kpi-rate">—</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Avg latency</div>
+            <div class="value" id="kpi-avg">—</div>
+        </div>
+        <div class="kpi">
+            <div class="label">p95 latency</div>
+            <div class="value" id="kpi-p95">—</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Estimated cost</div>
+            <div class="value" id="kpi-cost">—</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Alerts</div>
+            <div class="value" id="kpi-alerts">—</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Endpoints</h2>
+        <table id="endpoints-table">
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Route</th>
+                    <th class="num">Requests</th>
+                    <th class="num">Error %</th>
+                    <th class="num">Avg</th>
+                    <th class="num">p95</th>
+                    <th class="num">Cost</th>
+                </tr>
+            </thead>
+            <tbody id="endpoints-body">
+                <tr>
+                    <td colspan="7" class="empty">Loading…</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel">
+        <details>
+            <summary>Raw API responses</summary>
+            <pre id="raw-summary">{}</pre>
+            <pre id="raw-endpoints">{}</pre>
+        </details>
+    </div>
+
+    <div class="foot" id="last-refresh"></div>
+<div class="foot" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+  APIlytics MVP · Created and maintained by
+  <strong style="color:var(--text)">Abhay Pratap Singh</strong>
+  · Backend &amp; Integration ·
+  <a href="https://github.com/abhaypratap08" style="color:var(--accent);text-decoration:none">@abhaypratap08</a>
+</div>
+
+    <script>
+        (() => {
+            const API = ''; // same origin — page is served by FastAPI
+            const state = { window: '60m' };
+
+            const $ = (id) => document.getElementById(id);
+
+            function fmtInt(n) { return Number(n).toLocaleString(); }
+            function fmtPct(n) { return `${Number(n).toFixed(2)}%`; }
+            function fmtMs(n) { return `${Number(n).toFixed(1)} ms`; }
+            function fmtCost(n, unit) { return `${Number(n).toFixed(2)} ${unit}`; }
+
+            function setHealth(status) {
+                const el = $('health');
+                el.className = 'badge ' + (status.ok ? 'ok' : 'err');
+                el.textContent = status.text;
+            }
+
+            function showBanner(msg) {
+                const el = $('banner');
+                el.textContent = msg;
+                el.style.display = 'block';
+            }
+            function clearBanner() { $('banner').style.display = 'none'; }
+
+            async function fetchJSON(path) {
+                const res = await fetch(API + path);
+                const text = await res.text();
+                let body;
+                try { body = JSON.parse(text); } catch { body = text; }
+                if (!res.ok) {
+                    const detail = typeof body === 'object' ? JSON.stringify(body) : body;
+                    throw new Error(`HTTP ${res.status} ${path}\n${detail.slice(0, 400)}`);
+                }
+                return body;
+            }
+
+            async function checkHealth() {
+                try {
+                    const h = await fetchJSON('/health');
+                    setHealth({ ok: h.status === 'ok', text: `backend: ${h.status}` });
+                    return true;
+                } catch (e) {
+                    setHealth({ ok: false, text: 'backend unreachable' });
+                    return false;
+                }
+            }
+
+            function renderSummary(s) {
+                $('kpi-total').textContent = fmtInt(s.total_requests);
+                $('kpi-errors').textContent = fmtInt(s.error_count);
+                $('kpi-rate').textContent = fmtPct(s.error_rate_pct);
+                $('kpi-avg').textContent = fmtMs(s.avg_latency_ms);
+                $('kpi-p95').textContent = fmtMs(s.p95_latency_ms);
+                $('kpi-cost').innerHTML = `${Number(s.estimated_cost).toFixed(2)}<span class="unit">${s.cost_unit}</span>`;
+                $('kpi-alerts').textContent = fmtInt(s.alerts_count);
+                $('raw-summary').textContent = JSON.stringify(s, null, 2);
+            }
+
+            function renderEndpoints(e) {
+                const body = $('endpoints-body');
+                body.innerHTML = '';
+                if (!e.items || e.items.length === 0) {
+                    body.innerHTML = `<tr><td colspan="7" class="empty">No events in this window</td></tr>`;
+                    $('raw-endpoints').textContent = JSON.stringify(e, null, 2);
+                    return;
+                }
+                for (const it of e.items) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+        <td>${it.method}</td>
+        <td>${it.route_template}</td>
+        <td class="num">${fmtInt(it.request_count)}</td>
+        <td class="num">${fmtPct(it.error_rate_pct)}</td>
+        <td class="num">${fmtMs(it.avg_latency_ms)}</td>
+        <td class="num">${fmtMs(it.p95_latency_ms)}</td>
+        <td class="num">${fmtCost(it.estimated_cost, it.cost_unit)}</td>
+      `;
+                    body.appendChild(tr);
+                }
+                $('raw-endpoints').textContent = JSON.stringify(e, null, 2);
+            }
+
+            function renderEndpointsUnavailable(err) {
+                $('endpoints-body').innerHTML =
+                    `<tr><td colspan="7" class="empty">Endpoint route unavailable — ${err.message.split('\n')[0]}</td></tr>`;
+                $('raw-endpoints').textContent = String(err.message);
+            }
+
+            async function refresh() {
+                clearBanner();
+                $('refresh').disabled = true;
+                state.window = $('window').value;
+
+                const healthOK = await checkHealth();
+                if (!healthOK) {
+                    showBanner('Backend unreachable. Is uvicorn running on :8000? Try: uvicorn app.main:app --reload');
+                    $('refresh').disabled = false;
+                    return;
+                }
+
+                try {
+                    const summary = await fetchJSON(`/api/v1/summary?window=${state.window}`);
+                    renderSummary(summary);
+                } catch (e) {
+                    showBanner(`Summary failed:\n${e.message}`);
+                }
+
+                try {
+                    const endpoints = await fetchJSON(`/api/v1/endpoints?window=${state.window}&limit=20`);
+                    renderEndpoints(endpoints);
+                } catch (e) {
+                    renderEndpointsUnavailable(e);
+                }
+
+                $('last-refresh').textContent = `Last refresh: ${new Date().toLocaleString()} · window=${state.window}`;
+                $('refresh').disabled = false;
+            }
+
+            function makeEvent(overrides = {}) {
+                const routes = ['/api/orders/{id}', '/api/users/{id}', '/api/search', '/api/cart', '/api/checkout'];
+                return {
+                    event_id: crypto.randomUUID(),
+                    timestamp: new Date().toISOString(),
+                    method: 'GET',
+                    route_template: routes[Math.floor(Math.random() * routes.length)],
+                    status_code: 200,
+                    latency_ms: Math.round(50 + Math.random() * 400),
+                    ...overrides,
+                };
+            }
+
+            async function seed(kind) {
+                clearBanner();
+                const events = [];
+                if (kind === 'normal') {
+                    for (let i = 0; i < 5; i++) events.push(makeEvent());
+                } else {
+                    for (let i = 0; i < 3; i++) events.push(makeEvent({
+                        status_code: 500,
+                        latency_ms: 800 + Math.round(Math.random() * 800),
+                        route_template: '/api/checkout',
+                    }));
+                }
+                try {
+                    const res = await fetch(API + '/api/v1/events', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ events }),
+                    });
+                    const text = await res.text();
+                    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
+                    await refresh();
+                } catch (e) {
+                    showBanner(`Seed failed:\n${e.message}`);
+                }
+            }
+
+            $('refresh').addEventListener('click', refresh);
+            $('window').addEventListener('change', refresh);
+            $('seed-normal').addEventListener('click', () => seed('normal'));
+            $('seed-errors').addEventListener('click', () => seed('errors'));
+
+            refresh();
+        })();
+    </script>
+
+</body>
+
+</html>

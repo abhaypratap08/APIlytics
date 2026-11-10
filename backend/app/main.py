@@ -1,19 +1,56 @@
-from fastapi import FastAPI
+"""
+APIlytics backend.
 
-from app.api.routes import events, health, summary
+Created by Abhay Pratap Singh — backend and integration owner.
+Team: Abhay Pratap Singh, Jay Singh, Hariom Mani Tripathi.
+"""
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+
+from app.api.routes import endpoints, events, health, summary
 from app.core.config import settings
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Telemetry ingestion, storage, detection, and API for APIlytics MVP.",
+    description=(
+        "Telemetry ingestion, storage, detection, and API for APIlytics MVP.\n\n"
+        f"Created by **{settings.CREATOR_NAME}** ({settings.CREATOR_ROLE})."
+    ),
+    contact={
+        "name": settings.CREATOR_NAME,
+        "url": f"https://github.com/{settings.CREATOR_HANDLE}",
+    },
 )
+
+
+@app.middleware("http")
+async def creator_signature(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Creator"] = settings.CREATOR_NAME
+    response.headers["X-Project-Owner"] = settings.CREATOR_ROLE
+    return response
+
 
 app.include_router(health.router)
 app.include_router(events.router)
 app.include_router(summary.router)
+app.include_router(endpoints.router)
+
+
+@app.get("/ui", include_in_schema=False)
+def ui():
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/", tags=["Root"])
 def read_root():
-    return {"message": "APIlytics backend is running. Go to /docs for the API."}
+    return {
+        "message": "APIlytics backend is running. Go to /docs for the API, /ui for the dev console.",
+        "creator": settings.CREATOR_NAME,
+        "role": settings.CREATOR_ROLE,
+    }
