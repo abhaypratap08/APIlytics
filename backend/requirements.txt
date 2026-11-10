@@ -11,7 +11,19 @@ sqlalchemy>=2.0.35
 psycopg[binary]>=3.2.10
 alembic>=1.14
 
-# Testing
+# Testing & HTTP Client
 pytest>=8.3
 httpx>=0.27
+
+# Intelligence / ML (Added by Hariom)
 scikit-learn>=1.5
+numpy>=1.26
+
+# Browser Automation (Website Sandbox)
+playwright>=1.40
+
+# LangChain / AI Suggestions
+langchain>=0.3
+langchain-core>=0.3
+langchain-ollama>=0.2
+langchain-google-genai>=2.0

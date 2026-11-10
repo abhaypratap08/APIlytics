@@ -16,11 +16,12 @@ router = APIRouter()
 def get_alerts(
     window: str = Query("60m", description="One of 15m, 60m, 24h"),
     limit: int = Query(50, ge=1, le=200),
-    project_id: uuid.UUID = Query(..., description="Project ID (required, Mode B tenant scope)"),
+    project_id: uuid.UUID = Query(..., description="Project ID"),
+    source_type: str | None = Query(None, description="Filter by 'nginx' or 'browser_sandbox'"),
     db: Session = Depends(get_db),
 ) -> AlertsResponse:
     try:
-        data = compute_alerts(db, window, project_id, limit)
+        data = compute_alerts(db, window, project_id, limit, source_type)
     except InvalidWindowError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return AlertsResponse(**data)

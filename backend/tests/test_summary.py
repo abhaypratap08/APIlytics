@@ -85,3 +85,24 @@ def test_events_outside_window_excluded(project_ctx):
     pid = project_ctx["project_id"]
     assert client.get(f"/api/v1/summary?window=60m&project_id={pid}").json()["total_requests"] == 1
     assert client.get(f"/api/v1/summary?window=24h&project_id={pid}").json()["total_requests"] == 2
+
+def test_filter_by_source_type(project_ctx):
+    # Insert one NGINX event and one Sandbox event
+    _insert([
+        make_event(project_ctx, source_type="nginx", route_template="/nginx-route"),
+        make_event(project_ctx, source_type="browser_sandbox", route_template="/sandbox-route")
+    ])
+    
+    pid = project_ctx["project_id"]
+    
+    # No filter = 2 events
+    r_all = client.get(f"/api/v1/summary?window=60m&project_id={pid}").json()
+    assert r_all["total_requests"] == 2
+
+    # Filter NGINX = 1 event
+    r_nginx = client.get(f"/api/v1/summary?window=60m&project_id={pid}&source_type=nginx").json()
+    assert r_nginx["total_requests"] == 1
+
+    # Filter Sandbox = 1 event
+    r_sandbox = client.get(f"/api/v1/summary?window=60m&project_id={pid}&source_type=browser_sandbox").json()
+    assert r_sandbox["total_requests"] == 1

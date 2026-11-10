@@ -84,6 +84,7 @@ def parse_line(line: str, offset: int) -> dict | None:
         "timestamp": ts.isoformat(),
         "method": method,
         "route_template": normalize_route(path),
+        "source_type": "nginx",
         "status_code": status,
         "latency_ms": round(latency_s * 1000, 2),  # NGINX $request_time is seconds
         "request_size_bytes": int(rec["request_length"]) if rec.get("request_length") is not None else None,

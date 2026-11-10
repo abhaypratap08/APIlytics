@@ -31,19 +31,22 @@ def parse_window(window: str) -> timedelta:
     return ALLOWED_WINDOWS[window]
 
 
-def _window_filters(project_id: uuid.UUID, start: datetime, end: datetime):
-    return (
+def _window_filters(project_id: uuid.UUID, start: datetime, end: datetime, source_type: str | None = None):
+    filters = [
         TelemetryEvent.project_id == project_id,
         TelemetryEvent.timestamp >= start,
         TelemetryEvent.timestamp <= end,
-    )
+    ]
+    if source_type:
+        filters.append(TelemetryEvent.source_type == source_type)
+    return tuple(filters)
 
 
-def compute_summary(db: Session, window: str, project_id: uuid.UUID) -> dict:
+def compute_summary(db: Session, window: str, project_id: uuid.UUID, source_type: str | None = None) -> dict:
     delta = parse_window(window)
     now = datetime.now(timezone.utc)
     start = now - delta
-    base_filters = _window_filters(project_id, start, now)
+    base_filters = _window_filters(project_id, start, now, source_type)
 
     total = db.scalar(select(func.count()).select_from(TelemetryEvent).where(*base_filters)) or 0
     error_count = db.scalar(
@@ -71,11 +74,11 @@ def compute_summary(db: Session, window: str, project_id: uuid.UUID) -> dict:
     }
 
 
-def compute_endpoints(db: Session, window: str, limit: int, project_id: uuid.UUID) -> dict:
+def compute_endpoints(db: Session, window: str, limit: int, project_id: uuid.UUID, source_type: str | None = None) -> dict:
     delta = parse_window(window)
     now = datetime.now(timezone.utc)
     start = now - delta
-    base_filters = _window_filters(project_id, start, now)
+    base_filters = _window_filters(project_id, start, now, source_type)
 
     count_col = func.count().label("request_count")
     error_col = func.count().filter(TelemetryEvent.status_code >= 500).label("error_count")

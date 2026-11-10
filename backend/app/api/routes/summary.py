@@ -14,11 +14,12 @@ router = APIRouter()
             summary="Project-scoped aggregate metrics for a time window")
 def get_summary(
     window: str = Query("60m", description="One of 15m, 60m, 24h"),
-    project_id: uuid.UUID = Query(..., description="Project ID (required, Mode B tenant scope)"),
+    project_id: uuid.UUID = Query(..., description="Project ID"),
+    source_type: str | None = Query(None, description="Filter by 'nginx' or 'browser_sandbox'"),
     db: Session = Depends(get_db),
 ) -> SummaryResponse:
     try:
-        data = compute_summary(db, window, project_id)
+        data = compute_summary(db, window, project_id, source_type)
     except InvalidWindowError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return SummaryResponse(**data)

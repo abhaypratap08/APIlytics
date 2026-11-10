@@ -15,11 +15,12 @@ router = APIRouter()
 def get_endpoints(
     window: str = Query("60m", description="One of 15m, 60m, 24h"),
     limit: int = Query(20, ge=1, le=100),
-    project_id: uuid.UUID = Query(..., description="Project ID (required, Mode B tenant scope)"),
+    project_id: uuid.UUID = Query(..., description="Project ID"),
+    source_type: str | None = Query(None, description="Filter by 'nginx' or 'browser_sandbox'"),
     db: Session = Depends(get_db),
 ) -> EndpointsResponse:
     try:
-        data = compute_endpoints(db, window, limit, project_id)
+        data = compute_endpoints(db, window, limit, project_id, source_type)
     except InvalidWindowError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return EndpointsResponse(**data)

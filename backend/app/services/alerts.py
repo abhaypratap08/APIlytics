@@ -14,7 +14,7 @@ from app.models.telemetry import TelemetryEvent
 from app.services.metrics import parse_window
 
 
-def _aggregate_window(db: Session, start: datetime, end: datetime, project_id: uuid.UUID) -> list[EndpointAggregate]:
+def _aggregate_window(db: Session, start: datetime, end: datetime, project_id: uuid.UUID, source_type: str | None = None) -> list[EndpointAggregate]:
     count_col = func.count().label("rc")
     error_col = func.count().filter(TelemetryEvent.status_code >= 500).label("ec")
     avg_col = func.avg(TelemetryEvent.latency_ms).label("avg_l")
@@ -26,6 +26,7 @@ def _aggregate_window(db: Session, start: datetime, end: datetime, project_id: u
             TelemetryEvent.project_id == project_id,
             TelemetryEvent.timestamp >= start,
             TelemetryEvent.timestamp <= end,
+            TelemetryEvent.source_type == source_type if source_type else True
         )
         .group_by(TelemetryEvent.method, TelemetryEvent.route_template)
     )
@@ -41,14 +42,14 @@ def _aggregate_window(db: Session, start: datetime, end: datetime, project_id: u
     ]
 
 
-def compute_alerts(db: Session, window: str, project_id: uuid.UUID, limit: int = 50) -> dict:
+def compute_alerts(db: Session, window: str, project_id: uuid.UUID, limit: int = 50, source_type: str | None = None) -> dict:
     delta = parse_window(window)
     now = datetime.now(timezone.utc)
     start = now - delta
     baseline_start = start - delta
 
-    current = _aggregate_window(db, start, now, project_id)
-    baseline = _aggregate_window(db, baseline_start, start, project_id)
+    current = _aggregate_window(db, start, now, project_id, source_type)
+    baseline = _aggregate_window(db, baseline_start, start, project_id, source_type)
     findings = detect_findings(current, baseline, window)
 
     items = [

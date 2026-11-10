@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.api.routes import alerts, dev, endpoints, health, ingest, projects, sandbox, summary
+from app.api.routes import alerts, dev, endpoints, health, ingest, projects, sandbox, stream, summary
 from app.core.config import settings
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -71,6 +71,7 @@ app.include_router(endpoints.router)
 app.include_router(alerts.router)
 app.include_router(projects.router)
 app.include_router(sandbox.router)
+app.include_router(stream.router)
 
 
 @app.get("/ui", include_in_schema=False)
