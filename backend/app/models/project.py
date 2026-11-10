@@ -19,3 +19,4 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     integrations = relationship("Integration", back_populates="project", cascade="all, delete-orphan")
+    sandbox_sessions = relationship("SandboxSession", back_populates="project", cascade="all, delete-orphan")

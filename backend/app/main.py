@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.api.routes import alerts, dev, endpoints, health, ingest, projects, summary
@@ -46,6 +47,20 @@ async def creator_signature(request: Request, call_next):
     response.headers["X-Creator"] = settings.CREATOR_NAME
     response.headers["X-Project-Owner"] = settings.CREATOR_ROLE
     return response
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        settings.FRONTEND_URL,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Creator", "X-Project-Owner"],
+)
 
 
 app.include_router(health.router)

@@ -57,7 +57,7 @@ def test_rotate_credential_invalidates_old():
     # Old token works for ingest
     ev = {"event_id": str(uuid.uuid4()),
           "timestamp": "2026-11-10T12:00:00Z",
-          "method": "GET", "route_template": "/api/x",
+          "method": "GET", "route_template": "/api/x", "source_type": "nginx",
           "status_code": 200, "latency_ms": 50}
     ok = client.post("/api/v1/ingest/events", json={"events": [ev]},
                      headers={"Authorization": f"Bearer {old_token}"})
@@ -96,7 +96,7 @@ def test_revoke_credential():
 
     ev = {"event_id": str(uuid.uuid4()),
           "timestamp": "2026-11-10T12:00:00Z",
-          "method": "GET", "route_template": "/api/x",
+          "method": "GET", "route_template": "/api/x", "source_type": "nginx",
           "status_code": 200, "latency_ms": 50}
     bad = client.post("/api/v1/ingest/events", json={"events": [ev]},
                       headers={"Authorization": f"Bearer {token}"})

@@ -18,6 +18,7 @@ def _seed(project_ctx, n: int, route: str, status_code: int = 200):
         for _ in range(n):
             db.add(TelemetryEvent(
                 event_id=uuid.uuid4(),
+        source_type="nginx",
                 project_id=uuid.UUID(project_ctx["project_id"]),
                 integration_id=uuid.UUID(project_ctx["integration_id"]),
                 timestamp=datetime.now(timezone.utc) - timedelta(minutes=2),

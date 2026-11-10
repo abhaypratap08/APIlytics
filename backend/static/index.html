@@ -259,6 +259,7 @@
             }
 
             async function refresh() {
+    if (!state.projectId) { return; }
                 clearBanner();
                 $('refresh').disabled = true;
                 state.window = $('window').value;
@@ -332,7 +333,26 @@
             $('seed-normal').addEventListener('click', () => seed('normal'));
             $('seed-errors').addEventListener('click', () => seed('errors'));
 
-            refresh();
+
+  async function initProject() {
+    try {
+      const ctx = await fetchJSON('/api/v1/dev/context');
+      state.projectId = ctx.project_id;
+    } catch (e) {
+      showBanner('Could not load dev context: ' + e.message + ' (is DEV_MODE=true?)');
+    }
+  }
+
+  async function boot() {
+    await initProject();
+    if (state.projectId) {
+      refresh();
+    } else {
+      $('last-refresh').textContent = 'No project loaded — /api/v1/dev/context failed';
+    }
+  }
+
+  boot();
         })();
     </script>
 

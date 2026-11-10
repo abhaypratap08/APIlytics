@@ -16,6 +16,7 @@ def make_event(**overrides):
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "method": "GET",
         "route_template": "/api/test",
+        "source_type": "nginx",
         "status_code": 200,
         "latency_ms": 100.0,
     }

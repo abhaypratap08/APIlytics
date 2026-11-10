@@ -7,6 +7,7 @@ VALID_EVENT = {
     "timestamp": "2026-10-11T06:30:00Z",
     "method": "get",
     "route_template": "/api/orders/{id}",
+    "source_type": "nginx",
     "status_code": 200,
     "latency_ms": 184.5,
     "request_size_bytes": 1240,

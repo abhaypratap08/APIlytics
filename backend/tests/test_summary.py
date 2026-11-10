@@ -13,6 +13,7 @@ client = TestClient(app)
 def make_event(project_ctx, **overrides) -> TelemetryEvent:
     base = dict(
         event_id=uuid.uuid4(),
+        source_type="nginx",
         project_id=uuid.UUID(project_ctx["project_id"]),
         integration_id=uuid.UUID(project_ctx["integration_id"]),
         timestamp=datetime.now(timezone.utc) - timedelta(minutes=5),

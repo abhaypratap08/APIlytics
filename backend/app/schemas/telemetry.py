@@ -10,8 +10,16 @@ class TelemetryEventIn(BaseModel):
     timestamp: datetime
     method: str = Field(..., min_length=1, max_length=10)
     route_template: str = Field(..., min_length=1, max_length=512)
-    status_code: int = Field(..., ge=100, le=599)
+    status_code: Optional[int] = Field(default=None, ge=100, le=599)
     latency_ms: float = Field(..., ge=0)
+    
+    # Source fields
+    source_type: str = Field(..., min_length=1, max_length=32)
+    origin_host: Optional[str] = Field(default=None, max_length=255)
+    resource_type: Optional[str] = Field(default=None, max_length=32)
+    failure_kind: Optional[str] = Field(default=None, max_length=64)
+
+    # Sizes & Metadata
     request_size_bytes: Optional[int] = Field(default=None, ge=0)
     response_size_bytes: Optional[int] = Field(default=None, ge=0)
     client_id: Optional[str] = Field(default=None, max_length=128)

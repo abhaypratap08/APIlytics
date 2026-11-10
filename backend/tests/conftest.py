@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from app.core.security import hash_token
 from app.db.session import SessionLocal, engine
+import app.models  # noqa: F401
 from app.models.integration import Integration
 from app.models.project import Project
 
