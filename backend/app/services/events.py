@@ -1,4 +1,6 @@
-"""Telemetry ingestion service — authored by Abhay Pratap Singh."""
+"""Telemetry ingestion — authored by Abhay Pratap Singh."""
+import uuid
+
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -6,23 +8,19 @@ from app.models.telemetry import TelemetryEvent
 from app.schemas.telemetry import TelemetryEventIn
 
 
-def ingest_events(db: Session, events: list[TelemetryEventIn]) -> tuple[int, int]:
-    """
-    Insert telemetry events, skipping duplicates on event_id.
-
-    Uses PostgreSQL ON CONFLICT DO NOTHING so:
-      - duplicates across batches are skipped atomically
-      - duplicates within the same batch are also skipped correctly
-      - concurrent inserts cannot create double rows
-
-    Returns (accepted_count, duplicate_count).
-    """
+def ingest_events(
+    db: Session,
+    events: list[TelemetryEventIn],
+    project_id: uuid.UUID,
+    integration_id: uuid.UUID,
+) -> tuple[int, int]:
     if not events:
         return 0, 0
-
     values = [
         {
             "event_id": e.event_id,
+            "project_id": project_id,
+            "integration_id": integration_id,
             "timestamp": e.timestamp,
             "method": e.method,
             "route_template": e.route_template,
@@ -35,16 +33,13 @@ def ingest_events(db: Session, events: list[TelemetryEventIn]) -> tuple[int, int
         }
         for e in events
     ]
-
     stmt = (
         pg_insert(TelemetryEvent)
         .values(values)
         .on_conflict_do_nothing(index_elements=["event_id"])
         .returning(TelemetryEvent.event_id)
     )
-
     result = db.execute(stmt)
     inserted = len(result.fetchall())
     db.commit()
-
     return inserted, len(events) - inserted
