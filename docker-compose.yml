@@ -21,5 +21,19 @@ services:
       timeout: 5s
       retries: 5
 
+  nginx:
+    image: nginx:alpine
+    container_name: apilytics-nginx
+    restart: unless-stopped
+    labels:
+      com.apilytics.creator: "Abhay Pratap Singh"
+      com.apilytics.role: "Test telemetry source"
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
+      - ./nginx/logs:/var/log/nginx
+
 volumes:
   postgres_data:

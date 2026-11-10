@@ -23,3 +23,10 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# NGINX runtime
+nginx/logs/*
+!nginx/logs/.gitkeep
+
+# Collector state
+collector/.state.json
