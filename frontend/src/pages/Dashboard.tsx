@@ -1,300 +1,170 @@
-
+import { useEffect, useState } from "react";
 import {
-  Activity,
-  AlertTriangle,
-  ArrowDownRight,
-  ArrowUpRight,
-  Bell,
-  CircleDollarSign,
-  Clock3,
-  LayoutDashboard,
-  Network,
-  Search,
-  Settings,
-  ShieldCheck,
-  Zap,
+  Activity, AlertTriangle, Bell, CircleDollarSign, Clock3, ShieldCheck, Zap
 } from "lucide-react";
-
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
+  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-
-import "../App.css";
-
-const trafficData = [
-  { time: "09:00", requests: 1200 },
-  { time: "10:00", requests: 2100 },
-  { time: "11:00", requests: 1800 },
-  { time: "12:00", requests: 3200 },
-  { time: "13:00", requests: 2700 },
-  { time: "14:00", requests: 4100 },
-  { time: "15:00", requests: 3600 },
-  { time: "16:00", requests: 5200 },
-  { time: "17:00", requests: 4500 },
-];
-
-const activities = [
-  { method: "GET", endpoint: "/api/users", status: "200", latency: "124ms" },
-  { method: "POST", endpoint: "/api/auth/login", status: "200", latency: "210ms" },
-  { method: "GET", endpoint: "/api/products", status: "200", latency: "98ms" },
-  { method: "DELETE", endpoint: "/api/orders/42", status: "500", latency: "430ms" },
-  { method: "GET", endpoint: "/api/analytics", status: "200", latency: "156ms" },
-];
+import { api } from "../api/client";
+import { useProject } from "../hooks/useProject";
+import type { EndpointItem, SummaryResponse, Window } from "../types/api";
 
 function Dashboard() {
+  const { projectId, error: projectError } = useProject();
+  const [summary, setSummary] = useState<SummaryResponse | null>(null);
+  const [endpoints, setEndpoints] = useState<EndpointItem[]>([]);
+  const [win, setWin] = useState<Window>("60m");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      api.summary(win, projectId),
+      api.endpoints(win, projectId),
+    ])
+      .then(([s, e]) => {
+        if (cancelled) return;
+        setSummary(s);
+        setEndpoints(e.items);
+      })
+      .catch((err: Error) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId, win]);
+
+  const chartData = endpoints.slice(0, 8).map((e) => ({
+    time: e.route_template.length > 18 ? e.route_template.slice(0, 18) + "…" : e.route_template,
+    requests: e.request_count,
+  }));
+
+  const banner = projectError || error;
+
   return (
-   
-     
-<>
-      
-        <header className="topbar">
-          <div>
-            <p className="breadcrumb">Workspace / Overview</p>
-            <h2>Dashboard</h2>
-          </div>
+    <>
+      <header className="topbar">
+        <div>
+          <p className="breadcrumb">Workspace / Overview</p>
+          <h2>Dashboard</h2>
+        </div>
+        <div className="topbar-actions">
+          <select className="date-button" value={win} onChange={(e) => setWin(e.target.value as Window)}>
+            <option value="15m">Last 15m</option>
+            <option value="60m">Last 60m</option>
+            <option value="24h">Last 24h</option>
+          </select>
+        </div>
+      </header>
 
-          <div className="topbar-actions">
-            <div className="search-box">
-              <Search size={17} />
-              <input placeholder="Search anything..." />
+      {banner && <div className="negative" style={{ padding: 12, marginBottom: 16 }}>Backend error: {banner}</div>}
+      {loading && <p>Loading…</p>}
+
+      {summary && (
+        <>
+          <section className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-top"><Activity size={18} /> Total requests</div>
+              <h3 className="stat-change positive">{summary.total_requests.toLocaleString()}</h3>
             </div>
-            <button className="icon-button" aria-label="Notifications">
-              <Bell size={19} />
-            </button>
-            <div className="status-indicator">
-              <span></span> System Operational
+            <div className="stat-card">
+              <div className="stat-top"><AlertTriangle size={18} /> Error rate</div>
+              <h3 className="stat-change negative">{summary.error_rate_pct.toFixed(2)}%</h3>
             </div>
-          </div>
-        </header>
+            <div className="stat-card">
+              <div className="stat-top"><Clock3 size={18} /> p95 latency</div>
+              <h3 className="stat-change">{summary.p95_latency_ms.toFixed(1)} ms</h3>
+            </div>
+            <div className="stat-card">
+              <div className="stat-top"><CircleDollarSign size={18} /> Estimated cost</div>
+              <h3 className="stat-change">{summary.estimated_cost.toFixed(2)} <small>{summary.cost_unit}</small></h3>
+            </div>
+          </section>
 
-        <section className="welcome-section">
-          <div>
-            <h1>Welcome back, Jay 👋</h1>
-            <p>Here's what's happening with your APIs today.</p>
-          </div>
-          <button className="date-button">Last 24 hours ▾</button>
-        </section>
-
-        <section className="stats-grid">
-          <StatCard
-            title="Total API Requests"
-            value="1.28M"
-            change="+12.8%"
-            icon={<Activity />}
-            positive
-          />
-          <StatCard
-            title="Avg. Response Time"
-            value="142 ms"
-            change="-8.2%"
-            icon={<Zap />}
-            positive
-          />
-          <StatCard
-            title="Error Rate"
-            value="0.42%"
-            change="+0.12%"
-            icon={<AlertTriangle />}
-          />
-          <StatCard
-            title="Estimated API Cost"
-            value="$248.50"
-            change="-5.4%"
-            icon={<CircleDollarSign />}
-            positive
-          />
-        </section>
-
-        <section className="content-grid">
-          <div className="panel traffic-panel">
-            <div className="panel-header">
-              <div>
-                <h3>API Traffic Overview</h3>
-                <p>Request volume over time</p>
+          <section className="content-grid">
+            <div className="panel traffic-panel">
+              <div className="panel-header">
+                <h3>Requests by endpoint</h3>
+                <span className="chart-legend">Live data</span>
               </div>
-              <span className="chart-legend">
-                <span></span> API Requests
-              </span>
+              <div className="chart-container">
+                {chartData.length === 0 ? (
+                  <p>No requests in this window.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="time" />
+                      <YAxis />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="requests" stroke="#2ea043" fill="#2ea04355" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
 
-            <div className="chart-container">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trafficData}>
-                  <defs>
-                    <linearGradient
-                      id="trafficGradient"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    stroke="#252b3b"
-                    strokeDasharray="4 4"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="time"
-                    stroke="#788198"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#788198"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#171d2b",
-                      border: "1px solid #343b50",
-                      borderRadius: "10px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="requests"
-                    stroke="#9b7bff"
-                    strokeWidth={2.5}
-                    fill="url(#trafficGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="panel health-panel">
-            <div className="panel-header">
-              <div>
+            <div className="panel health-panel">
+              <div className="panel-header">
                 <h3>System Health</h3>
-                <p>Current infrastructure status</p>
+              </div>
+              <div className="health-status">
+                <div className="health-icon"><Zap size={24} /></div>
+                <h3>All systems operational</h3>
+                <p>Monitoring {endpoints.length} active endpoints</p>
+              </div>
+              <div className="health-row">
+                <span>Active Alerts</span>
+                <strong className={summary.alerts_count > 0 ? "warning-text" : ""}>{summary.alerts_count}</strong>
+              </div>
+              <div className="health-row">
+                <span>5xx Errors</span>
+                <strong>{summary.error_count}</strong>
+              </div>
+              <div className="health-row">
+                <span>Avg Latency</span>
+                <strong>{summary.avg_latency_ms.toFixed(1)} ms</strong>
               </div>
             </div>
+          </section>
 
-            <div className="health-status">
-              <div className="health-icon">
-                <ShieldCheck size={32} />
-              </div>
-              <h2>All Systems Normal</h2>
-              <p>All monitored services are operational.</p>
+          <section className="panel activity-panel">
+            <div className="panel-header">
+              <h3>Recent endpoint activity</h3>
             </div>
-
-            <div className="health-row">
-              <span>API Availability</span>
-              <strong>99.98%</strong>
+            <div className="table-wrapper">
+              {endpoints.length === 0 ? (
+                <p>No endpoint activity in this window.</p>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Method</th><th>Route</th>
+                      <th>Requests</th><th>Error %</th>
+                      <th>p95</th><th>Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {endpoints.slice(0, 10).map((e, i) => (
+                      <tr key={`${e.method}:${e.route_template}:${i}`}>
+                        <td><span className={`method ${e.method.toLowerCase()}`}>{e.method}</span></td>
+                        <td>{e.route_template}</td>
+                        <td>{e.request_count}</td>
+                        <td>{e.error_rate_pct.toFixed(2)}%</td>
+                        <td>{e.p95_latency_ms.toFixed(1)} ms</td>
+                        <td>{e.estimated_cost.toFixed(2)} {e.cost_unit}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <div className="health-row">
-              <span>Active Endpoints</span>
-              <strong>48</strong>
-            </div>
-            <div className="health-row">
-              <span>Active Alerts</span>
-              <strong className="warning-text">3</strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel activity-panel">
-          <div className="panel-header">
-            <div>
-              <h3>Recent API Activity</h3>
-              <p>Latest requests across your endpoints</p>
-            </div>
-            <button className="view-button">View all →</button>
-          </div>
-
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>METHOD</th>
-                  <th>ENDPOINT</th>
-                  <th>STATUS</th>
-                  <th>LATENCY</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activities.map((item, index) => (
-                  <tr key={index}>
-                    <td>
-                      <span className={`method ${item.method.toLowerCase()}`}>
-                        {item.method}
-                      </span>
-                    </td>
-                    <td className="endpoint">{item.endpoint}</td>
-                    <td>
-                      <span
-                        className={
-                          item.status === "200" ? "success-badge" : "error-badge"
-                        }
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="latency">
-                        <Clock3 size={14} /> {item.latency}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <footer className="footer">
-          APIlytics © 2026 · AI-powered API intelligence
-        </footer>
-      </>
-    
-  );
-}
-
-type StatCardProps = {
-  title: string;
-  value: string;
-  change: string;
-  icon: React.ReactNode;
-  positive?: boolean;
-};
-
-function StatCard({
-  title,
-  value,
-  change,
-  icon,
-  positive = false,
-}: StatCardProps) {
-  return (
-    <div className="stat-card">
-      <div className="stat-top">
-        <span>{title}</span>
-        <div className="stat-icon">{icon}</div>
-      </div>
-      <h2>{value}</h2>
-      <div className="stat-change">
-        {positive ? (
-          <ArrowUpRight size={16} />
-        ) : (
-          <ArrowDownRight size={16} />
-        )}
-        <strong className={positive ? "positive" : "negative"}>
-          {change}
-        </strong>
-        <span>vs previous period</span>
-      </div>
-    </div>
+          </section>
+        </>
+      )}
+    </>
   );
 }
 
