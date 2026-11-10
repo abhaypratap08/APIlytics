@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime, timezone
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -24,65 +23,86 @@ def make_event(**overrides):
     return base
 
 
-@pytest.fixture(autouse=True)
-def clean_events_table():
-    with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE telemetry_events RESTART IDENTITY"))
-    yield
+def auth_h(ctx):
+    return {"Authorization": f"Bearer {ctx['token']}"}
 
 
-def test_ingest_single_event():
-    event = make_event()
-    r = client.post("/api/v1/events", json={"events": [event]})
+def test_ingest_requires_auth():
+    r = client.post("/api/v1/ingest/events", json={"events": [make_event()]})
+    assert r.status_code == 401
+
+
+def test_invalid_token_rejected():
+    r = client.post("/api/v1/ingest/events", json={"events": [make_event()]},
+                    headers={"Authorization": "Bearer obviously-wrong"})
+    assert r.status_code == 401
+
+
+def test_ingest_single_event(project_ctx):
+    r = client.post("/api/v1/ingest/events", json={"events": [make_event()]}, headers=auth_h(project_ctx))
     assert r.status_code == 200
     assert r.json() == {"accepted": 1, "duplicates": 0}
 
 
-def test_ingest_batch_of_three():
-    events = [make_event() for _ in range(3)]
-    r = client.post("/api/v1/events", json={"events": events})
-    assert r.status_code == 200
+def test_ingest_batch_of_three(project_ctx):
+    r = client.post("/api/v1/ingest/events",
+                    json={"events": [make_event() for _ in range(3)]},
+                    headers=auth_h(project_ctx))
     assert r.json() == {"accepted": 3, "duplicates": 0}
 
 
-def test_duplicate_event_id_skipped():
+def test_duplicate_event_id_skipped(project_ctx):
     event = make_event()
-    r1 = client.post("/api/v1/events", json={"events": [event]})
-    r2 = client.post("/api/v1/events", json={"events": [event]})
+    r1 = client.post("/api/v1/ingest/events", json={"events": [event]}, headers=auth_h(project_ctx))
+    r2 = client.post("/api/v1/ingest/events", json={"events": [event]}, headers=auth_h(project_ctx))
     assert r1.json() == {"accepted": 1, "duplicates": 0}
     assert r2.json() == {"accepted": 0, "duplicates": 1}
 
 
-def test_duplicate_within_same_batch():
+def test_duplicate_within_same_batch(project_ctx):
     eid = str(uuid.uuid4())
     events = [make_event(event_id=eid), make_event(event_id=eid)]
-    r = client.post("/api/v1/events", json={"events": events})
+    r = client.post("/api/v1/ingest/events", json={"events": events}, headers=auth_h(project_ctx))
     assert r.json() == {"accepted": 1, "duplicates": 1}
 
 
-def test_invalid_status_code_rejected():
-    bad = make_event(status_code=99)
-    r = client.post("/api/v1/events", json={"events": [bad]})
+def test_invalid_status_code_rejected(project_ctx):
+    r = client.post("/api/v1/ingest/events",
+                    json={"events": [make_event(status_code=99)]},
+                    headers=auth_h(project_ctx))
     assert r.status_code == 422
 
 
-def test_missing_timezone_rejected():
-    bad = make_event(timestamp="2026-11-05T10:00:00")
-    r = client.post("/api/v1/events", json={"events": [bad]})
+def test_missing_timezone_rejected(project_ctx):
+    r = client.post("/api/v1/ingest/events",
+                    json={"events": [make_event(timestamp="2026-11-05T10:00:00")]},
+                    headers=auth_h(project_ctx))
     assert r.status_code == 422
 
 
-def test_empty_batch_rejected():
-    r = client.post("/api/v1/events", json={"events": []})
+def test_empty_batch_rejected(project_ctx):
+    r = client.post("/api/v1/ingest/events", json={"events": []}, headers=auth_h(project_ctx))
     assert r.status_code == 422
 
 
-def test_events_are_persisted():
-    event = make_event(route_template="/api/persist")
-    client.post("/api/v1/events", json={"events": [event]})
+def test_events_persisted_with_correct_ids(project_ctx):
+    client.post("/api/v1/ingest/events",
+                json={"events": [make_event(route_template="/api/persist")]},
+                headers=auth_h(project_ctx))
     with engine.connect() as conn:
-        row = conn.execute(
-            text("SELECT route_template, status_code FROM telemetry_events")
-        ).fetchone()
+        row = conn.execute(text(
+            "SELECT route_template, project_id::text, integration_id::text FROM telemetry_events"
+        )).fetchone()
     assert row[0] == "/api/persist"
-    assert row[1] == 200
+    assert row[1] == project_ctx["project_id"]
+    assert row[2] == project_ctx["integration_id"]
+
+
+def test_revoked_credential_rejected(project_ctx):
+    ok = client.post("/api/v1/ingest/events", json={"events": [make_event()]}, headers=auth_h(project_ctx))
+    assert ok.status_code == 200
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE integrations SET status='revoked' WHERE id = :id"),
+                     {"id": project_ctx["integration_id"]})
+    bad = client.post("/api/v1/ingest/events", json={"events": [make_event()]}, headers=auth_h(project_ctx))
+    assert bad.status_code == 401

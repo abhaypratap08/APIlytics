@@ -77,7 +77,7 @@ def compute_summary(db: Session, window: str) -> dict:
         "p95_latency_ms": round(float(p95_latency), 1) if p95_latency is not None else 0.0,
         "estimated_cost": round(estimated_cost, 2),
         "cost_unit": settings.COST_UNIT,
-        "alerts_count": 0,  # wired up after alerts service is implemented
+        "alerts_count": _count_alerts(db, window),
     }
 
 
@@ -139,3 +139,10 @@ def compute_endpoints(db: Session, window: str, limit: int = 20) -> dict:
         )
 
     return {"window": window, "items": items}
+
+
+
+def _count_alerts(db: Session, window: str) -> int:
+    """Lazy import to avoid circular import with app.services.alerts."""
+    from app.services.alerts import compute_alerts
+    return len(compute_alerts(db, window, limit=1000)["items"])
