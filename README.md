@@ -39,6 +39,36 @@ Connect **API behavior, security signals and cost** in one layer, at the endpoin
 
 Instead of three separate alerts (high traffic, high risk, high cost), APIlytics aims to give one clear finding with a suggested action, for example: *"This endpoint's traffic is abnormal, it shows signs of abuse, and it is raising our cost. Consider rate limiting."*
 
+
+## System Architecture
+
+The following flowchart illustrates the proposed APIlytics request-processing pipeline, from incoming API requests to telemetry collection, intelligence processing, and dashboard visualization.
+
+```mermaid
+flowchart TD
+    A[APIlytics] -->|Incoming API Request| B(NGINX Gateway)
+
+    B --> C{Request Valid?}
+
+    C -->|Yes| D[FastAPI Backend]
+    C -->|No| E[Reject Request]
+
+    D --> F{Request Type}
+
+    F -->|Telemetry| G[Telemetry Collector]
+    F -->|Analytics| H[Cost Intelligence]
+    F -->|Security| I[Anomaly Detection]
+
+    G --> J[(PostgreSQL)]
+    H --> J
+    I --> K[Alert Engine]
+
+    J --> L[Dashboard]
+    K --> L
+
+    L --> M[React Frontend]
+```
+
 ## Planned Features
 
 - Real-time API traffic monitoring
@@ -65,10 +95,6 @@ Instead of three separate alerts (high traffic, high risk, high cost), APIlytics
 2. **Abuse and cost:** abuse detection, cost attribution and forecasting
 3. **Recommendations:** LLM recommendations and alerts
 4. **Scale:** Kubernetes and multi-cloud telemetry
-
-## Getting Started
-
-Setup instructions will be added as the project takes shape.
 
 ## Team
 
